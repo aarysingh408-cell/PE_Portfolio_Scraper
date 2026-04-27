@@ -1,0 +1,166 @@
+============================================================
+  HOW TO PUT YOUR PE SCRAPER ONLINE — STEP BY STEP
+  Written for complete beginners. Follow in order.
+  Estimated time: 15 minutes
+============================================================
+
+
+WHAT YOU WILL HAVE AT THE END
+───────────────────────────────
+A real website at a link like:
+  https://pe-portfolio-finder.streamlit.app
+
+Anyone in your office opens that link in their browser.
+No installation. No technical knowledge needed.
+Works on phone and laptop.
+
+
+FILES YOU NEED (you should have all 4)
+────────────────────────────────────────
+  app.py             ← the website interface
+  scraper.py         ← the brain that does the scraping
+  requirements.txt   ← tells Streamlit what tools to install
+  packages.txt       ← tells Streamlit to install the browser
+
+
+════════════════════════════════════════════════════════════
+PART 1 — PUT YOUR FILES ON GITHUB
+════════════════════════════════════════════════════════════
+
+GitHub is like Google Drive for code.
+You upload your files there. Streamlit will read from there.
+
+STEP 1 — Log in to GitHub
+  Go to: https://github.com
+  Sign in with the account you just created.
+
+STEP 2 — Create a new Repository (a folder for your project)
+  A "repository" is just a folder that lives on GitHub.
+
+  1. Click the green "New" button on the left side
+     OR go to: https://github.com/new
+
+  2. Fill in the form:
+     Repository name:  pe-portfolio-finder
+     Description:      PE firm portfolio scraper
+     Visibility:       tick "Public"  ← IMPORTANT, must be Public
+                       (Private repos need a paid plan for Streamlit)
+
+  3. Scroll down and click the green "Create repository" button
+
+  4. You will see an empty folder. Good.
+
+STEP 3 — Upload your 4 files
+  1. Click "uploading an existing file" (blue link in the middle of the page)
+     OR click "Add file" → "Upload files"
+
+  2. Drag and drop ALL 4 files into the upload area:
+       app.py
+       scraper.py
+       requirements.txt
+       packages.txt
+
+  3. Scroll down to "Commit changes"
+     Leave the message as is, or type "first upload"
+
+  4. Click the green "Commit changes" button
+
+  5. You will now see all 4 files listed in your repository. ✅
+
+
+════════════════════════════════════════════════════════════
+PART 2 — DEPLOY ON STREAMLIT (make it a live website)
+════════════════════════════════════════════════════════════
+
+STEP 4 — Create a Streamlit account
+  1. Go to: https://streamlit.io
+  2. Click "Sign up" in the top right
+  3. Click "Continue with GitHub"  ← sign up using your GitHub account
+     This links the two accounts automatically. Very important.
+  4. Authorise the connection when it asks
+
+STEP 5 — Deploy your app
+  1. Once logged in to Streamlit, click "New app" (top right)
+
+  2. You will see a form. Fill it in:
+
+     Repository:    your-github-username/pe-portfolio-finder
+                    (it should appear as a dropdown, just select it)
+
+     Branch:        main
+
+     Main file path: app.py
+
+  3. App URL: you can customise this to something like:
+              pe-portfolio-finder
+              (the full URL will be pe-portfolio-finder.streamlit.app)
+
+  4. Click "Deploy!" ← the big button
+
+STEP 6 — Wait for it to build
+  You will see a screen with logs scrolling past.
+  This is Streamlit installing everything and setting up.
+  It takes about 3–5 minutes the first time.
+  Do not close the tab.
+
+STEP 7 — Your website is live! 🎉
+  When you see your app's interface appear, it is live.
+  The URL in your browser is your website address.
+  Copy it and share it with your entire team.
+
+  It will look like:
+  https://pe-portfolio-finder.streamlit.app
+
+
+════════════════════════════════════════════════════════════
+PART 3 — SHARE WITH YOUR TEAM
+════════════════════════════════════════════════════════════
+
+Just send them the URL. That is all.
+
+They open it in Chrome, Safari, Firefox — any browser.
+They type a PE firm name, click Search, get the list.
+No account needed for them. No installation. Nothing.
+
+
+════════════════════════════════════════════════════════════
+MAKING CHANGES LATER (if you want to update anything)
+════════════════════════════════════════════════════════════
+
+If you ever want to change something:
+  1. Go to github.com → your repository
+  2. Click on the file you want to change
+  3. Click the pencil icon (Edit)
+  4. Make your changes
+  5. Click "Commit changes"
+  6. Streamlit automatically detects the change and updates the website
+     within about 1–2 minutes. No action needed from you.
+
+
+════════════════════════════════════════════════════════════
+COMMON PROBLEMS
+════════════════════════════════════════════════════════════
+
+Problem: "Repository not found" in Streamlit
+Fix: Make sure your GitHub repo is set to Public, not Private
+
+Problem: App crashes on startup
+Fix: Make sure all 4 files are uploaded. Check packages.txt is there.
+
+Problem: Search returns 0 results
+Fix: Some websites actively block scrapers. This is normal for 
+     about 20% of sites. Try a different firm name.
+
+Problem: The app is slow (30-40 seconds per search)
+Fix: This is expected. Scraping a live website takes time.
+     The spinner message tells users to wait — they know it's working.
+
+
+════════════════════════════════════════════════════════════
+NEED HELP?
+════════════════════════════════════════════════════════════
+
+At any step, just come back to Claude and say exactly what 
+you see on the screen. Copy any error message exactly.
+I will fix it immediately.
+============================================================
