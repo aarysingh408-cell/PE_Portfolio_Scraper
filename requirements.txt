@@ -1,6 +1,0 @@
-streamlit
-playwright
-beautifulsoup4
-duckduckgo-search
-google-generativeai
-nest_asyncio
