@@ -1,4 +1,0 @@
-streamlit
-duckduckgo-search
-playwright
-beautifulsoup4
