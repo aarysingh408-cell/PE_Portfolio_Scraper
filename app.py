@@ -17,7 +17,7 @@ def install_playwright_browser():
 code, out, err = install_playwright_browser()
 
 # ── Page config ───────────────────────────────────────────────
-st.set_page_config(page_title="Portscope", page_icon="🔍", layout="centered")
+st.set_page_config(page_title="Portfolio Scraper", page_icon="🔍", layout="centered")
 
 st.markdown("""
 <style>
@@ -90,7 +90,7 @@ with st.expander("🔧 Debug info (open if results are empty)"):
                 from google import genai
                 client = genai.Client(api_key=api_key)
                 response = client.models.generate_content(
-                    model="gemini-2.0-flash",
+                    model="gemini-1.5-flash",
                     contents="Say: Gemini is working"
                 )
                 st.success(f"Gemini OK: {response.text[:80]}")
