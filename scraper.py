@@ -30,9 +30,11 @@ def extract_with_groq(text_content, firm_name, api_key):
                         f"Rules:\n"
                         f"- Return one company name per line\n"
                         f"- No bullets, numbers, or dashes before names\n"
+                        f"- INCLUDE all types of investments: companies, real estate assets, infrastructure projects, parks, funds, digital businesses\n"
+                        f"- INCLUDE names that sound like places or properties if they appear as investment holdings\n"
                         f"- Do NOT include companies marked as Realised, Exited, Divested, or Former\n"
                         f"- Do NOT include navigation items, sector labels, regions, years, fund names\n"
-                        f"- Do NOT include tech/web tools: Cloudflare, Cookiebot, Google, LinkedIn, Vimeo, YouTube, Facebook, Twitter\n"
+                        f"- Do NOT include website tools: Cloudflare, Cookiebot, Google, LinkedIn, Vimeo, YouTube, Facebook, Twitter\n"
                         f"- Do NOT include cookie consent or privacy-related text\n"
                         f"- Do NOT include '{firm_name}' itself\n"
                         f"- If nothing found, reply: NONE\n\n"
@@ -84,7 +86,7 @@ DATABASE = {
     "CVC Capital Partners": {"url": "https://www.cvc.com/portfolio/our-portfolio/?strategy=all&country=India&industries=all&partner=undefined&cardName=null",                                                                    "pagination": "single"},
     "EQT":                  {"url": "https://eqtgroup.com/about/current-portfolio?country=india",                                                                                                                               "pagination": "single"},
     "PAG":                  {"url": "https://www.pag.com/en/private-equity/#portfolio",                                                                                                                                         "pagination": "single"},
-    "Actis":                {"url": "https://www.act.is/about-us/portfolio/?_portfolio_status=current&_paged=", "pagination": "actis", "total_pages": 6},
+    "Actis":                {"url": "https://www.act.is/about-us/portfolio/?_portfolio_status=current&_paged=", "pagination": "actis", "total_pages": 3},
 }
 
 DATABASE_LOWER = {k.lower(): k for k in DATABASE.keys()}
@@ -447,3 +449,4 @@ async def scrape_portfolio(firm_name, api_key, status_widget=None):
             unique.append(c.strip())
 
     return unique
+    
