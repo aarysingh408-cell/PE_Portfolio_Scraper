@@ -12,6 +12,35 @@ from urllib.parse import urlparse, urljoin
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 def extract_with_groq(html, firm_name, api_key):
+    # Check if this is visible text (not raw HTML)
+    if html.startswith("VISIBLE_TEXT:"):
+        text_content = html[len("VISIBLE_TEXT:"):]
+        try:
+            resp = requests.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                json={
+                    "model": "llama-3.1-8b-instant",
+                    "messages": [{"role": "user", "content": f"From this list of text items from {firm_name}\'s portfolio page, extract only the portfolio/investee company names. Return one name per line, nothing else. If none found reply NONE:\n\n{text_content}"}],
+                    "temperature": 0,
+                    "max_tokens": 1024
+                },
+                timeout=60
+            )
+            resp.raise_for_status()
+            raw = resp.json()["choices"][0]["message"]["content"].strip()
+            if not raw or raw.upper() == "NONE":
+                return []
+            results = []
+            for line in raw.split("\n"):
+                clean = re.sub(r"^[\d\.\-\*\•\–\—\s]+", "", line).strip()
+                if 2 <= len(clean) <= 80:
+                    results.append(clean)
+            return results
+        except Exception as e:
+            print(f"Groq visible text error: {e}")
+            return []
+
     # First try Next.js JSON extraction — much faster and more accurate
     nextjs_results = extract_from_nextjs(html, firm_name)
     if len(nextjs_results) >= 3:
@@ -282,17 +311,24 @@ async def scrape_portfolio(firm_name, api_key, status_widget=None):
                 await page.goto(portfolio_url, wait_until='networkidle', timeout=60000)
                 await page.wait_for_timeout(5000)
                 await try_close_popups(page)
-                # Wait for actual content to appear — not just JS to load
-                try:
-                    await page.wait_for_selector('h2, h3, h4, article, .card, [class*="card"], [class*="portfolio"], [class*="company"]', timeout=15000)
-                except:
-                    pass
                 await scroll_fully(page)
-                # Scroll back up and down again to trigger lazy loading
                 await page.evaluate('window.scrollTo(0, 0)')
                 await page.wait_for_timeout(1000)
                 await scroll_fully(page)
-                all_html.append(await page.content())
+                # Extract visible text — works for Next.js, React, and all JS frameworks
+                visible_text = await page.evaluate("""() => {
+                    const elements = document.querySelectorAll('h1,h2,h3,h4,h5,p,a,span,div');
+                    const texts = [];
+                    for (const el of elements) {
+                        const text = el.innerText ? el.innerText.trim() : '';
+                        if (text && text.length > 1 && text.length < 80 && !text.includes('\n')) {
+                            texts.push(text);
+                        }
+                    }
+                    return [...new Set(texts)];
+                }""")
+                # Join visible text and use as input to Groq
+                all_html.append("VISIBLE_TEXT:" + "\n".join(visible_text[:300]))
 
             elif pagination == 'load_more':
                 await page.goto(portfolio_url, wait_until='domcontentloaded', timeout=30000)
@@ -349,4 +385,3 @@ async def scrape_portfolio(firm_name, api_key, status_widget=None):
             unique.append(c.strip())
 
     return unique
-    
