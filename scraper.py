@@ -218,9 +218,18 @@ async def scrape_portfolio(firm_name, api_key, status_widget=None):
                 portfolio_url = find_portfolio_page(homepage, links)
 
             if pagination == 'single':
-                await page.goto(portfolio_url, wait_until='domcontentloaded', timeout=30000)
-                await page.wait_for_timeout(3000)
+                await page.goto(portfolio_url, wait_until='networkidle', timeout=60000)
+                await page.wait_for_timeout(5000)
                 await try_close_popups(page)
+                # Wait for actual content to appear — not just JS to load
+                try:
+                    await page.wait_for_selector('h2, h3, h4, article, .card, [class*="card"], [class*="portfolio"], [class*="company"]', timeout=15000)
+                except:
+                    pass
+                await scroll_fully(page)
+                # Scroll back up and down again to trigger lazy loading
+                await page.evaluate('window.scrollTo(0, 0)')
+                await page.wait_for_timeout(1000)
                 await scroll_fully(page)
                 all_html.append(await page.content())
 
