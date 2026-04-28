@@ -26,11 +26,12 @@ def extract_with_groq(text_content, firm_name, api_key):
                     "role": "user",
                     "content": (
                         f"Below is all the visible text from {firm_name}'s portfolio page.\n"
-                        f"Extract ONLY the names of portfolio/investee companies.\n"
+                        f"Extract ONLY the names of CURRENT/ACTIVE portfolio companies.\n"
                         f"Rules:\n"
                         f"- Return one company name per line\n"
                         f"- No bullets, numbers, or dashes before names\n"
-                        f"- Do NOT include navigation items, sector labels, regions, years\n"
+                        f"- Do NOT include companies marked as Realised, Exited, Divested, or Former\n"
+                        f"- Do NOT include navigation items, sector labels, regions, years, fund names\n"
                         f"- Do NOT include '{firm_name}' itself\n"
                         f"- If nothing found, reply: NONE\n\n"
                         f"Text:\n{text_content}"
@@ -291,25 +292,54 @@ async def scrape_portfolio(firm_name, api_key, status_widget=None):
             elif pagination == 'load_more':
                 await page.goto(portfolio_url, wait_until='domcontentloaded', timeout=45000)
                 await page.wait_for_timeout(5000)
-                # Click load more buttons
-                for _ in range(20):
+                # Close popups first
+                await page.wait_for_timeout(2000)
+                for sel in [
+                    'button:has-text("Accept all")', 'button:has-text("Accept All")',
+                    'button:has-text("Accept cookies")', 'button:has-text("Accept")',
+                    'button:has-text("Allow all")', 'button:has-text("I agree")',
+                    'button:has-text("OK")', 'button:has-text("Got it")',
+                    '[class*="accept"]', '[class*="cookie"] button',
+                ]:
+                    try:
+                        btn = page.locator(sel).first
+                        if await btn.is_visible(timeout=600):
+                            await btn.click()
+                            await page.wait_for_timeout(1000)
+                            break
+                    except: continue
+
+                # Click load more / next page buttons repeatedly
+                for _ in range(30):
                     clicked = False
-                    for txt in ['Load More','Show More','View More','Load more','Show more']:
+                    for txt in [
+                        'Load More', 'Show More', 'View More',
+                        'Load more', 'Show more', 'View more',
+                        'Next', 'Next page', 'Next Page',
+                        'More', 'See more', 'See More',
+                    ]:
                         try:
                             btn = page.locator(f"text={txt}").first
                             if await btn.is_visible(timeout=1000):
                                 await btn.click()
-                                await page.wait_for_timeout(2000)
+                                await page.wait_for_timeout(2500)
                                 clicked = True
+                                print(f"Clicked: {txt}")
                                 break
                         except: continue
-                    if not clicked: break
-                for _ in range(4):
-                    await page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
-                    await page.wait_for_timeout(1500)
+
+                    # Also try scrolling to trigger infinite scroll
+                    if not clicked:
+                        prev_height = await page.evaluate('document.body.scrollHeight')
+                        await page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
+                        await page.wait_for_timeout(2000)
+                        new_height = await page.evaluate('document.body.scrollHeight')
+                        if new_height == prev_height:
+                            break  # Page stopped growing — we have everything
+
                 visible = await page.evaluate(JS_VISIBLE_TEXT)
                 if visible:
-                    all_text_blocks.append('\n'.join(visible[:300]))
+                    all_text_blocks.append('\n'.join(visible[:500]))
 
             elif pagination == 'numbered':
                 for pg in range(1, total_pages + 1):
