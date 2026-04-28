@@ -158,7 +158,13 @@ with st.expander("🔧 Debug info"):
             loop.close()
             st.write(f"2. HTML length: {len(html)} chars")
             st.write(f"3. HTML snippet:")
-            st.code(html[5000:5500])
+            # Show snippet from deeper in HTML where content usually lives
+            mid = len(html) // 2
+            st.code(html[mid:mid+800])
+            # Also check if any company-like words appear
+            import re
+            headings = re.findall(r'<h[234][^>]*>([^<]+)</h[234]>', html)
+            st.write(f"Headings found in HTML: {headings[:20]}")
             st.write("4. Sending to Groq...")
             resp = requests.post(
                 "https://api.groq.com/openai/v1/chat/completions",
