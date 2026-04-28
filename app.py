@@ -143,16 +143,22 @@ with st.expander("🔧 Debug info"):
             st.write(f"3. HTML preview (first 500 chars):")
             st.code(html[:500])
 
-            # Test Gemini on that HTML
+            # Test Gemini on that HTML directly — show raw response
             st.write("4. Sending to Gemini...")
-            companies = extract_with_gemini(html, "EQT", api_key)
-            st.write(f"5. Gemini returned: {len(companies)} companies")
-            if companies:
-                st.success("Companies found:")
-                for c in companies:
-                    st.write(f"  - {c}")
-            else:
-                st.error("Gemini returned nothing — check HTML preview above")
+            try:
+                resp = requests.post(
+                    f"https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key={api_key}",
+                    json={"contents": [{"parts": [{"text": f"List 5 company names you can find in this HTML. Return only names, one per line.\n\n{html[:5000]}"}]}]},
+                    timeout=30
+                )
+                st.write(f"5. Gemini HTTP status: {resp.status_code}")
+                st.write(f"6. Raw Gemini response:")
+                st.code(resp.text[:1000])
+                if resp.status_code == 200:
+                    text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+                    st.success(f"Gemini returned: {text[:500]}")
+            except Exception as ge:
+                st.error(f"Gemini call failed: {ge}")
 
         except Exception as e:
             st.error(f"Step by step test failed: {e}")
