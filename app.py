@@ -162,9 +162,23 @@ with st.expander("🔧 Debug info"):
             mid = len(html) // 2
             st.code(html[mid:mid+800])
             # Also check if any company-like words appear
-            import re
+            import re, json
             headings = re.findall(r'<h[234][^>]*>([^<]+)</h[234]>', html)
             st.write(f"Headings found in HTML: {headings[:20]}")
+
+            # Try to extract Next.js data
+            match = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', html, re.DOTALL)
+            if match:
+                st.write("✅ Found __NEXT_DATA__ JSON in page!")
+                try:
+                    data = json.loads(match.group(1))
+                    st.write(f"JSON keys at root: {list(data.keys())[:10]}")
+                    # Show a snippet of the JSON
+                    st.code(json.dumps(data, indent=2)[:2000])
+                except Exception as je:
+                    st.error(f"JSON parse error: {je}")
+            else:
+                st.warning("No __NEXT_DATA__ found — page may need more time to load")
             st.write("4. Sending to Groq...")
             resp = requests.post(
                 "https://api.groq.com/openai/v1/chat/completions",
