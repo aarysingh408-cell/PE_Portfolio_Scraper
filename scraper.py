@@ -70,7 +70,7 @@ def extract_with_groq(text_content, firm_name, api_key):
 # ============================================================
 
 DATABASE = {
-    "KKR":                  {"url": "https://www.kkr.com/invest/portfolio",                                                                                                                                                     "pagination": "numbered", "total_pages": 20},
+    "KKR":                  {"url": "https://www.kkr.com/invest/portfolio",                                                                                                                                                     "pagination": "kkr"},
     "Carlyle":              {"url": "https://www.carlyle.com/portfolio?title=&industry=All&field_geography_target_id_verf=196&status=111&field_acquired_value=All&sort_by=title&sort_order=ASC",                                 "pagination": "single"},
     "Carlyle Group":        {"url": "https://www.carlyle.com/portfolio?title=&industry=All&field_geography_target_id_verf=196&status=111&field_acquired_value=All&sort_by=title&sort_order=ASC",                                 "pagination": "single"},
     "Warburg Pincus":       {"url": "https://warburgpincus.com/investments/",                                                                                                                                                   "pagination": "single"},
@@ -356,6 +356,67 @@ async def scrape_portfolio(firm_name, api_key, status_widget=None):
                         break
                     all_text_blocks.append('\n'.join(visible[:300]))
 
+            elif pagination == 'kkr':
+                # KKR — click Region dropdown → tick Asia Pacific → loop through 7 pages
+                await page.goto(portfolio_url, wait_until='domcontentloaded', timeout=45000)
+                await page.wait_for_timeout(5000)
+
+                # Step 1: Click the Region dropdown
+                try:
+                    region_dropdown = page.locator('text=All Regions').first
+                    await region_dropdown.click()
+                    await page.wait_for_timeout(2000)
+                    print("Clicked Region dropdown")
+                except Exception as e:
+                    print(f"Region dropdown error: {e}")
+
+                # Step 2: Tick Asia Pacific checkbox
+                try:
+                    asia_cb = page.locator('text=Asia Pacific').first
+                    await asia_cb.click()
+                    await page.wait_for_timeout(3000)
+                    print("Clicked Asia Pacific")
+                except Exception as e:
+                    print(f"Asia Pacific click error: {e}")
+
+                # Step 3: Close dropdown by clicking elsewhere
+                try:
+                    await page.keyboard.press('Escape')
+                    await page.wait_for_timeout(1000)
+                except: pass
+
+                # Step 4: Loop through all pages using Next button
+                page_num = 1
+                while page_num <= 7:
+                    update(f"Step 2/3 — KKR Asia Pacific page {page_num}/7...")
+                    await page.wait_for_timeout(2000)
+
+                    # Scroll to load all rows on this page
+                    for _ in range(3):
+                        await page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
+                        await page.wait_for_timeout(1000)
+
+                    # Get visible text
+                    visible = await page.evaluate(JS_VISIBLE_TEXT)
+                    if visible:
+                        all_text_blocks.append('\n'.join(visible[:500]))
+                        print(f"Page {page_num}: {len(visible)} text items")
+
+                    # Click Next button (>)
+                    if page_num < 7:
+                        try:
+                            next_btn = page.locator('button:has-text(">")').last
+                            if not await next_btn.is_visible(timeout=1000):
+                                next_btn = page.locator('[aria-label="Next page"]').first
+                            if not await next_btn.is_visible(timeout=1000):
+                                next_btn = page.locator('button[aria-label="next"]').first
+                            await next_btn.click()
+                            await page.wait_for_timeout(2500)
+                        except Exception as e:
+                            print(f"Next button error on page {page_num}: {e}")
+                            break
+                    page_num += 1
+
             elif pagination == 'actis':
                 # Actis uses ?_portfolio_status=current&_paged=N
                 for pg in range(1, total_pages + 1):
@@ -450,4 +511,3 @@ async def scrape_portfolio(firm_name, api_key, status_widget=None):
             unique.append(c.strip())
 
     return unique
-    
