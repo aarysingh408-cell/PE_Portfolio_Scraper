@@ -93,20 +93,12 @@ with st.expander("🔧 Debug info"):
             try:
                 resp = requests.post(
                     "https://api.groq.com/openai/v1/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {api_key}",
-                        "Content-Type": "application/json"
-                    },
-                    json={
-                        "model": "llama-3.1-8b-instant",
-                        "messages": [{"role": "user", "content": "Say: Groq is working"}],
-                        "max_tokens": 20
-                    },
+                    headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                    json={"model": "llama-3.1-8b-instant", "messages": [{"role": "user", "content": "Say: Groq is working"}], "max_tokens": 20},
                     timeout=15
                 )
                 resp.raise_for_status()
-                text = resp.json()["choices"][0]["message"]["content"]
-                st.success(f"Groq OK: {text[:60]}")
+                st.success(f"Groq OK: {resp.json()['choices'][0]['message']['content'][:60]}")
             except Exception as e:
                 st.error(f"Groq failed: {e}")
 
@@ -115,7 +107,7 @@ with st.expander("🔧 Debug info"):
             async def test_browser():
                 from playwright.async_api import async_playwright
                 async with async_playwright() as p:
-                    browser = await p.chromium.launch(headless=True, args=['--no-sandbox','--disable-dev-shm-usage'])
+                    browser = await p.chromium.launch(headless=True, args=["--no-sandbox","--disable-dev-shm-usage"])
                     page = await browser.new_page()
                     await page.goto("https://example.com", timeout=15000)
                     title = await page.title()
@@ -131,73 +123,89 @@ with st.expander("🔧 Debug info"):
                 st.error(f"Browser failed: {e}")
 
     st.markdown("---")
-    if st.button("Test EQT step by step"):
+    if st.button("Test EQT — visible text"):
         eqt_url = DATABASE["EQT"]["url"]
         st.write(f"1. URL: `{eqt_url}`")
-        async def fetch_eqt():
+        st.write("2. Opening page and waiting for full render...")
+
+        async def get_eqt_visible():
             from playwright.async_api import async_playwright
             async with async_playwright() as p:
-                browser = await p.chromium.launch(headless=True, args=["--no-sandbox","--disable-dev-shm-usage"])
+                browser = await p.chromium.launch(
+                    headless=True,
+                    args=["--no-sandbox","--disable-dev-shm-usage"]
+                )
                 context = await browser.new_context(
                     user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
-                    viewport={"width":1280,"height":900}
+                    viewport={"width": 1280, "height": 900}
                 )
                 page = await context.new_page()
-                await page.goto(eqt_url, wait_until="domcontentloaded", timeout=30000)
-                await page.wait_for_timeout(3000)
-                await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                await page.wait_for_timeout(2000)
-                html = await page.content()
+                # Wait for full network idle — all JS must finish
+                await page.goto(eqt_url, wait_until="networkidle", timeout=60000)
+                await page.wait_for_timeout(5000)
+                # Scroll to load lazy content
+                for _ in range(6):
+                    await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                    await page.wait_for_timeout(1500)
+                # Extract only visible text — what a human sees on screen
+                visible = await page.evaluate("""() => {
+                    const results = [];
+                    const walker = document.createTreeWalker(
+                        document.body,
+                        NodeFilter.SHOW_TEXT,
+                        null,
+                        false
+                    );
+                    let node;
+                    while (node = walker.nextNode()) {
+                        const text = node.textContent.trim();
+                        const parent = node.parentElement;
+                        if (!parent) continue;
+                        const tag = parent.tagName.toLowerCase();
+                        if (['script','style','noscript'].includes(tag)) continue;
+                        const style = window.getComputedStyle(parent);
+                        if (style.display === 'none' || style.visibility === 'hidden') continue;
+                        if (text.length >= 2 && text.length <= 80) {
+                            results.push(text);
+                        }
+                    }
+                    return [...new Set(results)];
+                }""")
                 await context.close()
                 await browser.close()
-                return html
+                return visible
+
         try:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-            html = loop.run_until_complete(fetch_eqt())
+            visible_texts = loop.run_until_complete(get_eqt_visible())
             loop.close()
-            st.write(f"2. HTML length: {len(html)} chars")
-            st.write(f"3. HTML snippet:")
-            # Show snippet from deeper in HTML where content usually lives
-            mid = len(html) // 2
-            st.code(html[mid:mid+800])
-            # Also check if any company-like words appear
-            import re, json
-            headings = re.findall(r'<h[234][^>]*>([^<]+)</h[234]>', html)
-            st.write(f"Headings found in HTML: {headings[:20]}")
 
-            # Try to extract Next.js data
-            match = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', html, re.DOTALL)
-            if match:
-                st.write("✅ Found __NEXT_DATA__ JSON in page!")
-                try:
-                    data = json.loads(match.group(1))
-                    st.write(f"JSON keys at root: {list(data.keys())[:10]}")
-                    # Show a snippet of the JSON
-                    st.code(json.dumps(data, indent=2)[:2000])
-                except Exception as je:
-                    st.error(f"JSON parse error: {je}")
-            else:
-                st.warning("No __NEXT_DATA__ found — page may need more time to load")
+            st.write(f"3. Visible text items found: **{len(visible_texts)}**")
+            st.write("Sample (first 80 items):")
+            st.code("\n".join(visible_texts[:80]))
+
             st.write("4. Sending to Groq...")
+            text_block = "\n".join(visible_texts[:300])
             resp = requests.post(
                 "https://api.groq.com/openai/v1/chat/completions",
                 headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
                 json={
                     "model": "llama-3.1-8b-instant",
-                    "messages": [{"role": "user", "content": f"List company names you find in this HTML, one per line:\n\n{html[:5000]}"}],
-                    "max_tokens": 500
+                    "messages": [{"role": "user", "content": f"These are all the visible text items on EQT's portfolio page. Extract ONLY the portfolio company names. Return one name per line, nothing else:\n\n{text_block}"}],
+                    "temperature": 0,
+                    "max_tokens": 1024
                 },
                 timeout=30
             )
             st.write(f"5. Groq status: {resp.status_code}")
             if resp.status_code == 200:
-                text = resp.json()["choices"][0]["message"]["content"]
-                st.success(f"Groq response:\n{text[:1000]}")
+                answer = resp.json()["choices"][0]["message"]["content"]
+                st.success(f"Companies found:\n{answer}")
             else:
-                st.error(f"Groq error: {resp.text[:500]}")
+                st.error(f"Groq error: {resp.text[:300]}")
         except Exception as e:
-            st.error(f"Failed: {e}")
+            st.error(f"Error: {e}")
 
 # ── Search input ──────────────────────────────────────────────
 firm_input = st.text_input(
@@ -205,9 +213,7 @@ firm_input = st.text_input(
     placeholder="Start typing — e.g. kkr, eqt, carlyle, warburg...",
 )
 
-# ── Autocomplete suggestions ──────────────────────────────────
 selected_firm = None
-
 if firm_input and len(firm_input) >= 1:
     suggestions = get_suggestions(firm_input)
     if suggestions:
@@ -222,7 +228,6 @@ if firm_input and len(firm_input) >= 1:
 firm_to_search = selected_firm or firm_input
 search_clicked = st.button("Search Portfolio")
 
-# ── Run search ────────────────────────────────────────────────
 if search_clicked:
     if not firm_to_search.strip():
         st.warning("Please enter a firm name first.")
@@ -264,18 +269,9 @@ if search_clicked:
                     col2.markdown(f"**{i+1}.** {company}")
         else:
             st.error(f"No companies found for '{firm_to_search}'.")
-            st.markdown("""
-            **Tips:**
-            - Select a suggestion from the database for best results
-            - Check the spelling of the firm name
-            - Open 🔧 Debug info and run both tests
-            """)
+            st.markdown("Open 🔧 Debug info → click **Test EQT — visible text** to diagnose.")
 
-# ── Footer ────────────────────────────────────────────────────
 st.markdown(
     "<div class='ask-footer'>Built by Aaryaman Singh &nbsp;·&nbsp; Data sourced live from firm websites</div>",
     unsafe_allow_html=True
 )
-
-# ── TEMPORARY: inject step by step test into debug expander ──
-# This block adds a test button — remove after debugging is done
