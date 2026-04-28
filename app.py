@@ -185,22 +185,18 @@ if firm_to_search and (search_clicked or (firm_to_search != firm_input.strip()))
         ws = wb.active
         ws.title = f"{firm_to_search} Portfolio"
 
-        # Header rows
-        ws.merge_cells('C4:D4')
+        # Header row
         ws['C4'] = firm_to_search.upper()
         ws['C4'].font = Font(bold=True, size=12)
-
-        ws['D4'] = "PORTFOLIO PAGE URL"
-        ws['D4'].font = Font(bold=True, size=10)
 
         # Column headers
         ws['C5'] = "SR NO"
         ws['D5'] = "COMPANY"
-        for cell in [ws['C5'], ws['D5']]:
-            cell.font = Font(bold=True)
-            cell.fill = PatternFill("solid", fgColor="033A49")
-            cell.font = Font(bold=True, color="FFFFFF")
-            cell.alignment = Alignment(horizontal="center")
+        ws['C5'].font = Font(bold=True, color="FFFFFF")
+        ws['C5'].fill = PatternFill("solid", fgColor="033A49")
+        ws['C5'].alignment = Alignment(horizontal="center")
+        ws['D5'].font = Font(bold=True, color="FFFFFF")
+        ws['D5'].fill = PatternFill("solid", fgColor="033A49")
 
         # Data rows
         for i, company in enumerate(companies, 1):
