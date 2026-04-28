@@ -130,6 +130,55 @@ with st.expander("🔧 Debug info"):
             except Exception as e:
                 st.error(f"Browser failed: {e}")
 
+    st.markdown("---")
+    if st.button("Test EQT step by step"):
+        eqt_url = DATABASE["EQT"]["url"]
+        st.write(f"1. URL: `{eqt_url}`")
+        async def fetch_eqt():
+            from playwright.async_api import async_playwright
+            async with async_playwright() as p:
+                browser = await p.chromium.launch(headless=True, args=["--no-sandbox","--disable-dev-shm-usage"])
+                context = await browser.new_context(
+                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
+                    viewport={"width":1280,"height":900}
+                )
+                page = await context.new_page()
+                await page.goto(eqt_url, wait_until="domcontentloaded", timeout=30000)
+                await page.wait_for_timeout(3000)
+                await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                await page.wait_for_timeout(2000)
+                html = await page.content()
+                await context.close()
+                await browser.close()
+                return html
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            html = loop.run_until_complete(fetch_eqt())
+            loop.close()
+            st.write(f"2. HTML length: {len(html)} chars")
+            st.write(f"3. HTML snippet:")
+            st.code(html[5000:5500])
+            st.write("4. Sending to Groq...")
+            resp = requests.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                json={
+                    "model": "llama-3.1-8b-instant",
+                    "messages": [{"role": "user", "content": f"List company names you find in this HTML, one per line:\n\n{html[:5000]}"}],
+                    "max_tokens": 500
+                },
+                timeout=30
+            )
+            st.write(f"5. Groq status: {resp.status_code}")
+            if resp.status_code == 200:
+                text = resp.json()["choices"][0]["message"]["content"]
+                st.success(f"Groq response:\n{text[:1000]}")
+            else:
+                st.error(f"Groq error: {resp.text[:500]}")
+        except Exception as e:
+            st.error(f"Failed: {e}")
+
 # ── Search input ──────────────────────────────────────────────
 firm_input = st.text_input(
     label="Investor / PE firm name",
@@ -207,3 +256,6 @@ st.markdown(
     "<div class='ask-footer'>Built by Aaryaman Singh &nbsp;·&nbsp; Data sourced live from firm websites</div>",
     unsafe_allow_html=True
 )
+
+# ── TEMPORARY: inject step by step test into debug expander ──
+# This block adds a test button — remove after debugging is done
