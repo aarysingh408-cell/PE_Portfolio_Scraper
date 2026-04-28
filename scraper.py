@@ -12,6 +12,12 @@ from urllib.parse import urlparse, urljoin
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 def extract_with_groq(html, firm_name, api_key):
+    # First try Next.js JSON extraction — much faster and more accurate
+    nextjs_results = extract_from_nextjs(html, firm_name)
+    if len(nextjs_results) >= 3:
+        print(f"Found {len(nextjs_results)} companies via Next.js JSON")
+        return nextjs_results
+
     try:
         prompt = f"""You are reading HTML from the portfolio page of an investment firm called "{firm_name}".
 
@@ -59,6 +65,61 @@ HTML:
         print(f"Groq error: {e}")
         return []
 
+
+
+# ============================================================
+#  NEXT.JS DATA EXTRACTOR
+#  Many modern sites store all data as JSON in __NEXT_DATA__
+#  This extracts company names directly from that JSON
+# ============================================================
+
+import json
+
+def extract_from_nextjs(html, firm_name):
+    """Extract company names from Next.js __NEXT_DATA__ JSON."""
+    try:
+        import re
+        # Find the __NEXT_DATA__ script tag
+        match = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', html, re.DOTALL)
+        if not match:
+            return []
+
+        data = json.loads(match.group(1))
+
+        # Convert entire JSON to string and search for company-like patterns
+        data_str = json.dumps(data)
+
+        # Look for common field names that hold company names
+        names = set()
+        def search_json(obj, depth=0):
+            if depth > 20:
+                return
+            if isinstance(obj, dict):
+                for key, val in obj.items():
+                    # Keys that likely contain company names
+                    if key.lower() in ['name', 'title', 'company', 'companyname',
+                                       'portfolio_company', 'portfoliocompany',
+                                       'investee', 'holding']:
+                        if isinstance(val, str) and 2 <= len(val) <= 80:
+                            names.add(val.strip())
+                    else:
+                        search_json(val, depth+1)
+            elif isinstance(obj, list):
+                for item in obj:
+                    search_json(item, depth+1)
+
+        search_json(data)
+
+        # Filter out obvious non-company names
+        junk = {'current portfolio', 'portfolio', 'investments', 'home', 'about',
+                'contact', 'news', 'press', 'careers', 'legal', 'undefined',
+                'true', 'false', 'null', firm_name.lower()}
+        results = [n for n in names if n.lower() not in junk and len(n.split()) <= 6]
+        return sorted(results)
+
+    except Exception as e:
+        print(f"Next.js extraction error: {e}")
+        return []
 
 # ============================================================
 #  DATABASE — 13 firms researched by Aaryaman Singh
@@ -288,3 +349,4 @@ async def scrape_portfolio(firm_name, api_key, status_widget=None):
             unique.append(c.strip())
 
     return unique
+    
