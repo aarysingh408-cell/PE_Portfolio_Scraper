@@ -351,6 +351,74 @@ async def scrape_portfolio(firm_name, api_key, status_widget=None):
                         break
                     all_text_blocks.append('\n'.join(visible[:300]))
 
+            elif pagination == 'actis':
+                # Actis uses ?_portfolio_status=current&_paged=N
+                for pg in range(1, total_pages + 1):
+                    update(f"Step 2/3 — Loading page {pg}...")
+                    page_url = f"{portfolio_url}{pg}"
+                    visible = await get_visible_text(page, page_url)
+                    if not visible or len(visible) < 5:
+                        print(f"Page {pg} empty, stopping")
+                        break
+                    all_text_blocks.append('\n'.join(visible[:400]))
+
+            elif pagination == 'click_numbered':
+                # First load the page
+                await page.goto(portfolio_url, wait_until='domcontentloaded', timeout=45000)
+                await page.wait_for_timeout(4000)
+                # Close popups
+                for sel in [
+                    'button:has-text("Accept all")', 'button:has-text("Accept All")',
+                    'button:has-text("Accept cookies")', 'button:has-text("Accept")',
+                    'button:has-text("Allow all")', 'button:has-text("I agree")',
+                    '[class*="accept"]', '[class*="cookie"] button',
+                ]:
+                    try:
+                        btn = page.locator(sel).first
+                        if await btn.is_visible(timeout=600):
+                            await btn.click()
+                            await page.wait_for_timeout(1000)
+                            break
+                    except: continue
+
+                current_page = 1
+                while current_page <= total_pages:
+                    update(f"Step 2/3 — Reading page {current_page}...")
+                    # Scroll to load content
+                    for _ in range(3):
+                        await page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
+                        await page.wait_for_timeout(1000)
+                    # Get visible text from current page
+                    visible = await page.evaluate(JS_VISIBLE_TEXT)
+                    if visible:
+                        all_text_blocks.append('\n'.join(visible[:400]))
+                    # Try to click next page number
+                    next_page = current_page + 1
+                    clicked = False
+                    # Try clicking the next page number directly
+                    for selector in [
+                        f'a:has-text("{next_page}")',
+                        f'button:has-text("{next_page}")',
+                        f'[aria-label="Page {next_page}"]',
+                        'a:has-text("›")',
+                        'a:has-text(">")',
+                        'a:has-text("Next")',
+                        '[class*="next"] a',
+                        '[class*="next"] button',
+                        'li.next a',
+                    ]:
+                        try:
+                            btn = page.locator(selector).first
+                            if await btn.is_visible(timeout=1000):
+                                await btn.click()
+                                await page.wait_for_timeout(3000)
+                                clicked = True
+                                break
+                        except: continue
+                    if not clicked:
+                        break  # No next page found
+                    current_page += 1
+
         except Exception as e:
             print(f"Browser error: {e}")
         finally:
