@@ -4,7 +4,7 @@ import subprocess
 import sys
 import requests
 
-from scraper import scrape_portfolio
+from scraper import scrape_portfolio, extract_with_gemini, DATABASE
 
 @st.cache_resource
 def install_playwright_browser():
@@ -76,7 +76,6 @@ with st.expander("🔧 Debug info"):
     with col1:
         if st.button("Test Gemini API"):
             try:
-                # Direct HTTP call — no library, no version issues
                 resp = requests.post(
                     f"https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key={api_key}",
                     json={"contents": [{"parts": [{"text": "Say: working"}]}]},
@@ -107,6 +106,56 @@ with st.expander("🔧 Debug info"):
                 st.success(f"Browser OK: {title}")
             except Exception as e:
                 st.error(f"Browser failed: {e}")
+
+    # ── Step by step test for EQT ──────────────────────────────
+    st.markdown("---")
+    st.markdown("**Step by step test:**")
+    if st.button("Test EQT scrape step by step"):
+        url = DATABASE["eqt"]["url"]
+        st.write(f"1. URL from database: `{url}`")
+
+        # Test browser fetch
+        try:
+            async def fetch_eqt():
+                from playwright.async_api import async_playwright
+                async with async_playwright() as p:
+                    browser = await p.chromium.launch(headless=True, args=['--no-sandbox','--disable-dev-shm-usage'])
+                    context = await browser.new_context(
+                        user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
+                        viewport={'width': 1280, 'height': 900}
+                    )
+                    page = await context.new_page()
+                    await page.goto(url, wait_until='domcontentloaded', timeout=30000)
+                    await page.wait_for_timeout(3000)
+                    await page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
+                    await page.wait_for_timeout(2000)
+                    html = await page.content()
+                    await context.close()
+                    await browser.close()
+                    return html
+
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            html = loop.run_until_complete(fetch_eqt())
+            loop.close()
+
+            st.write(f"2. HTML fetched: {len(html)} characters")
+            st.write(f"3. HTML preview (first 500 chars):")
+            st.code(html[:500])
+
+            # Test Gemini on that HTML
+            st.write("4. Sending to Gemini...")
+            companies = extract_with_gemini(html, "EQT", api_key)
+            st.write(f"5. Gemini returned: {len(companies)} companies")
+            if companies:
+                st.success("Companies found:")
+                for c in companies:
+                    st.write(f"  - {c}")
+            else:
+                st.error("Gemini returned nothing — check HTML preview above")
+
+        except Exception as e:
+            st.error(f"Step by step test failed: {e}")
 
 # ── Input ─────────────────────────────────────────────────────
 firm_name = st.text_input(
@@ -156,7 +205,7 @@ if search_clicked:
                     col2.markdown(f"**{i+1}.** {company}")
         else:
             st.error(f"No companies found for '{firm_name}'.")
-            st.markdown("Open the 🔧 Debug info panel above and click both test buttons to diagnose.")
+            st.markdown("Open 🔧 Debug info above → click **Test EQT scrape step by step** to see exactly where it fails.")
 
 st.markdown(
     "<div class='ask-footer'>Built by Aaryaman Singh &nbsp;·&nbsp; Data sourced live from firm websites</div>",
