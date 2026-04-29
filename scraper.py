@@ -357,61 +357,18 @@ async def scrape_portfolio(firm_name, api_key, status_widget=None):
                     all_text_blocks.append('\n'.join(visible[:300]))
 
             elif pagination == 'kkr':
-                # KKR — click Region dropdown → tick Asia Pacific → loop through pages
+                # KKR — load all 299 companies across all pages, no filter
+                # Pages: 20 per page, total ~15 pages
                 await page.goto(portfolio_url, wait_until='domcontentloaded', timeout=45000)
-                await page.wait_for_timeout(6000)
+                await page.wait_for_timeout(5000)
 
-                # Step 1: Click the REGION dropdown
-                try:
-                    await page.locator('select, [class*="region"], [class*="Region"]').last.click()
-                    await page.wait_for_timeout(1000)
-                except: pass
-
-                # Try clicking the dropdown trigger text
-                for sel in [
-                    'text=All Regions',
-                    '[class*="dropdown"]:has-text("Region")',
-                    '[class*="select"]:has-text("Region")',
-                ]:
-                    try:
-                        el = page.locator(sel).first
-                        if await el.is_visible(timeout=1500):
-                            await el.click()
-                            await page.wait_for_timeout(1500)
-                            print(f"Opened region dropdown: {sel}")
-                            break
-                    except: continue
-
-                # Step 2: Click Asia Pacific option
-                for sel in [
-                    'text=Asia Pacific',
-                    'label:has-text("Asia Pacific")',
-                    '[class*="option"]:has-text("Asia Pacific")',
-                    'li:has-text("Asia Pacific")',
-                    'input[value="Asia Pacific"]',
-                ]:
-                    try:
-                        el = page.locator(sel).first
-                        if await el.is_visible(timeout=1500):
-                            await el.click()
-                            await page.wait_for_timeout(4000)
-                            print(f"Selected Asia Pacific: {sel}")
-                            break
-                    except: continue
-
-                # Close dropdown
-                await page.keyboard.press('Escape')
-                await page.wait_for_timeout(1000)
-
-                # Step 3: Loop through all pages
                 current_page = 1
-                max_pages = 7
+                max_pages = 15
                 while current_page <= max_pages:
-                    update(f"Step 2/3 — KKR Asia Pacific page {current_page}/{max_pages}...")
-                    await page.wait_for_timeout(2000)
+                    update(f"Step 2/3 — KKR page {current_page}/{max_pages}...")
 
-                    # Scroll to load all rows
-                    for _ in range(4):
+                    # Scroll to load all rows on this page
+                    for _ in range(3):
                         await page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
                         await page.wait_for_timeout(1000)
 
@@ -419,21 +376,18 @@ async def scrape_portfolio(firm_name, api_key, status_widget=None):
                     visible = await page.evaluate(JS_VISIBLE_TEXT)
                     if visible:
                         all_text_blocks.append('\n'.join(visible[:500]))
-                        print(f"Page {current_page}: captured {len(visible)} items")
+                        print(f"KKR page {current_page}: {len(visible)} items")
 
                     if current_page >= max_pages:
                         break
 
-                    # Click next page — try multiple approaches
+                    # Click next page number
                     next_clicked = False
                     next_page_num = current_page + 1
-
-                    # Try clicking the next page number directly
                     for sel in [
                         f'button:has-text("{next_page_num}")',
                         f'a:has-text("{next_page_num}")',
                         f'[aria-label="Page {next_page_num}"]',
-                        f'[aria-label="Go to page {next_page_num}"]',
                     ]:
                         try:
                             el = page.locator(sel).last
@@ -441,34 +395,24 @@ async def scrape_portfolio(firm_name, api_key, status_widget=None):
                                 await el.click()
                                 await page.wait_for_timeout(3000)
                                 next_clicked = True
-                                print(f"Clicked page {next_page_num}")
                                 break
                         except: continue
 
-                    # If page number click failed, try Next/arrow button
+                    # Try Next arrow if page number failed
                     if not next_clicked:
-                        for sel in [
-                            '[aria-label="Next"]',
-                            '[aria-label="next"]',
-                            '[aria-label="Next page"]',
-                            '[aria-label="next page"]',
-                            'button[class*="next"]',
-                            'a[class*="next"]',
-                            '[class*="pagination"] button:last-child',
-                            '[class*="pagination"] a:last-child',
-                        ]:
+                        for sel in ['[aria-label="Next"]','[aria-label="next"]',
+                                    '[aria-label="Next page"]','button[class*="next"]']:
                             try:
                                 el = page.locator(sel).first
                                 if await el.is_visible(timeout=1000):
                                     await el.click()
                                     await page.wait_for_timeout(3000)
                                     next_clicked = True
-                                    print(f"Clicked next via: {sel}")
                                     break
                             except: continue
 
                     if not next_clicked:
-                        print(f"Could not find next button on page {current_page}")
+                        print(f"No next button found on page {current_page}, stopping")
                         break
 
                     current_page += 1
@@ -567,3 +511,4 @@ async def scrape_portfolio(firm_name, api_key, status_widget=None):
             unique.append(c.strip())
 
     return unique
+    
