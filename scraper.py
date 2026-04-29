@@ -357,65 +357,121 @@ async def scrape_portfolio(firm_name, api_key, status_widget=None):
                     all_text_blocks.append('\n'.join(visible[:300]))
 
             elif pagination == 'kkr':
-                # KKR — click Region dropdown → tick Asia Pacific → loop through 7 pages
+                # KKR — click Region dropdown → tick Asia Pacific → loop through pages
                 await page.goto(portfolio_url, wait_until='domcontentloaded', timeout=45000)
-                await page.wait_for_timeout(5000)
+                await page.wait_for_timeout(6000)
 
-                # Step 1: Click the Region dropdown
+                # Step 1: Click the REGION dropdown
                 try:
-                    region_dropdown = page.locator('text=All Regions').first
-                    await region_dropdown.click()
-                    await page.wait_for_timeout(2000)
-                    print("Clicked Region dropdown")
-                except Exception as e:
-                    print(f"Region dropdown error: {e}")
-
-                # Step 2: Tick Asia Pacific checkbox
-                try:
-                    asia_cb = page.locator('text=Asia Pacific').first
-                    await asia_cb.click()
-                    await page.wait_for_timeout(3000)
-                    print("Clicked Asia Pacific")
-                except Exception as e:
-                    print(f"Asia Pacific click error: {e}")
-
-                # Step 3: Close dropdown by clicking elsewhere
-                try:
-                    await page.keyboard.press('Escape')
+                    await page.locator('select, [class*="region"], [class*="Region"]').last.click()
                     await page.wait_for_timeout(1000)
                 except: pass
 
-                # Step 4: Loop through all pages using Next button
-                page_num = 1
-                while page_num <= 7:
-                    update(f"Step 2/3 — KKR Asia Pacific page {page_num}/7...")
+                # Try clicking the dropdown trigger text
+                for sel in [
+                    'text=All Regions',
+                    '[class*="dropdown"]:has-text("Region")',
+                    '[class*="select"]:has-text("Region")',
+                ]:
+                    try:
+                        el = page.locator(sel).first
+                        if await el.is_visible(timeout=1500):
+                            await el.click()
+                            await page.wait_for_timeout(1500)
+                            print(f"Opened region dropdown: {sel}")
+                            break
+                    except: continue
+
+                # Step 2: Click Asia Pacific option
+                for sel in [
+                    'text=Asia Pacific',
+                    'label:has-text("Asia Pacific")',
+                    '[class*="option"]:has-text("Asia Pacific")',
+                    'li:has-text("Asia Pacific")',
+                    'input[value="Asia Pacific"]',
+                ]:
+                    try:
+                        el = page.locator(sel).first
+                        if await el.is_visible(timeout=1500):
+                            await el.click()
+                            await page.wait_for_timeout(4000)
+                            print(f"Selected Asia Pacific: {sel}")
+                            break
+                    except: continue
+
+                # Close dropdown
+                await page.keyboard.press('Escape')
+                await page.wait_for_timeout(1000)
+
+                # Step 3: Loop through all pages
+                current_page = 1
+                max_pages = 7
+                while current_page <= max_pages:
+                    update(f"Step 2/3 — KKR Asia Pacific page {current_page}/{max_pages}...")
                     await page.wait_for_timeout(2000)
 
-                    # Scroll to load all rows on this page
-                    for _ in range(3):
+                    # Scroll to load all rows
+                    for _ in range(4):
                         await page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
                         await page.wait_for_timeout(1000)
 
-                    # Get visible text
+                    # Grab visible text
                     visible = await page.evaluate(JS_VISIBLE_TEXT)
                     if visible:
                         all_text_blocks.append('\n'.join(visible[:500]))
-                        print(f"Page {page_num}: {len(visible)} text items")
+                        print(f"Page {current_page}: captured {len(visible)} items")
 
-                    # Click Next button (>)
-                    if page_num < 7:
+                    if current_page >= max_pages:
+                        break
+
+                    # Click next page — try multiple approaches
+                    next_clicked = False
+                    next_page_num = current_page + 1
+
+                    # Try clicking the next page number directly
+                    for sel in [
+                        f'button:has-text("{next_page_num}")',
+                        f'a:has-text("{next_page_num}")',
+                        f'[aria-label="Page {next_page_num}"]',
+                        f'[aria-label="Go to page {next_page_num}"]',
+                    ]:
                         try:
-                            next_btn = page.locator('button:has-text(">")').last
-                            if not await next_btn.is_visible(timeout=1000):
-                                next_btn = page.locator('[aria-label="Next page"]').first
-                            if not await next_btn.is_visible(timeout=1000):
-                                next_btn = page.locator('button[aria-label="next"]').first
-                            await next_btn.click()
-                            await page.wait_for_timeout(2500)
-                        except Exception as e:
-                            print(f"Next button error on page {page_num}: {e}")
-                            break
-                    page_num += 1
+                            el = page.locator(sel).last
+                            if await el.is_visible(timeout=1000):
+                                await el.click()
+                                await page.wait_for_timeout(3000)
+                                next_clicked = True
+                                print(f"Clicked page {next_page_num}")
+                                break
+                        except: continue
+
+                    # If page number click failed, try Next/arrow button
+                    if not next_clicked:
+                        for sel in [
+                            '[aria-label="Next"]',
+                            '[aria-label="next"]',
+                            '[aria-label="Next page"]',
+                            '[aria-label="next page"]',
+                            'button[class*="next"]',
+                            'a[class*="next"]',
+                            '[class*="pagination"] button:last-child',
+                            '[class*="pagination"] a:last-child',
+                        ]:
+                            try:
+                                el = page.locator(sel).first
+                                if await el.is_visible(timeout=1000):
+                                    await el.click()
+                                    await page.wait_for_timeout(3000)
+                                    next_clicked = True
+                                    print(f"Clicked next via: {sel}")
+                                    break
+                            except: continue
+
+                    if not next_clicked:
+                        print(f"Could not find next button on page {current_page}")
+                        break
+
+                    current_page += 1
 
             elif pagination == 'actis':
                 # Actis uses ?_portfolio_status=current&_paged=N
