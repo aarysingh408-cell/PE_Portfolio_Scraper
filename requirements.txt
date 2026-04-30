@@ -1,0 +1,7 @@
+streamlit
+playwright
+beautifulsoup4
+duckduckgo-search
+requests
+openpyxl
+pypdf
