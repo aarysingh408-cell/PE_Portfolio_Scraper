@@ -306,7 +306,7 @@ with tab2:
     st.markdown("#### DRHP Section Extractor")
     st.markdown(
         "Search for any company that has filed a DRHP with SEBI. "
-        "ASK Eve will extract the key sections for you — no need to read 400 pages."
+        "Alt's Buddy will extract the key sections for you — no need to read 500 pages, save time!"
     )
 
     # Sections info
