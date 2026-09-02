@@ -97,7 +97,7 @@ st.markdown(f"""
     <div class="ask-header-left">
         <div class="ask-gold-bar"></div>
         <div>
-            <p class="ask-header-title">ASK Eve</p>
+            <p class="ask-header-title">Alt's Buddy</p>
             <p class="ask-header-sub">Alternative Investments Intelligence Platform</p>
         </div>
     </div>
