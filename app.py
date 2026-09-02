@@ -23,7 +23,7 @@ install_playwright_browser()
 
 # ── Page config ───────────────────────────────────────────────
 st.set_page_config(
-    page_title="ASK Eve",
+    page_title="Alt's Buddy",
     page_icon="🔮",
     layout="centered"
 )
