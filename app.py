@@ -101,7 +101,7 @@ st.markdown(f"""
             <p class="ask-header-sub">Alternative Investments Intelligence Platform</p>
         </div>
     </div>
-    <div class="ask-badge">🔍 {st.session_state.search_count} searches</div>
+    <div class="ask-badge">🔍 19 searches</div>
 </div>
 """, unsafe_allow_html=True)
 
